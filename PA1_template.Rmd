@@ -1,0 +1,181 @@
+---
+title: "Reproducible Research: Peer Assessment 1"
+author: "Kum Buh Paul"
+date:  "Sept 2017"
+output: html_document
+---
+
+This is the first project for Reproducible Research course in the datascience specialization. This project answer a series of questions related to data collected from [FitBit](https://en.wikipedia.org/wiki/Fitbit)
+
+##Data
+The data for the analysis was downloaded from course web site.
+
+  Dataset: [Activity monitoring data](https://arabia.starzplay.com/en/landing?utm_source=affiliate&utm_medium=desktop&utm_campaign=propc&utm_content=1039081&data2=359583771131)
+  
+The dataset includes 3 variables:
+
+- steps: Number of steps taking in a 5-minute interval(missing values are coded as NA)
+- date: The date on which the measurement was taken in YYY-MM-DD format
+- interval: Identifier for the 5-minute interval in which measurement was taken.
+
+The dataset is stored in a comma-separated-value(CSV) file and there are a total of 17,558 observations
+
+
+
+The data used for this analysis is contained in a file called activity.csv. This code could be written to download incase the file isn't present.
+
+## Downloading Data
+```{r echo=TRUE}
+if(!file.exists("activity.zip")) {
+  #download the data
+  fileUrl <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+  download.file(fileUrl, destfile = "activity.zip")
+  
+  # unzip file
+  unzip("AMD.zip")
+}
+```
+
+## Loading and preprocessing the data
+
+
+```{r}
+#load data
+activity <- read.csv("activity.csv")
+```
+
+## Tidying Data
+
+Change variable date into dateformat using lubridate package
+```{r}
+library(lubridate)
+activity$date <- ymd(activity$date)
+```
+
+Check the activity dataset with str() and head()
+
+
+## What is mean total number of steps taken per day?
+
+Using the dplyr library, we will group the activity dataset by date, then summarise it with the mean function while ignoring the missing values.
+```{r}
+library(dplyr)
+steps_day <- summarise(group_by(activity, date), "steps" = sum(steps, na.rm = T))
+print(steps_day)
+
+# create a histogram
+hist(steps_day$steps, xlab = "number of steps per day", main = "Total steps taken each day", col = "blue")
+
+#mean and median of the total steps
+meanNumber <- mean(steps_day$steps); meanNumber
+medianNumber <- median(steps_day$steps); medianNumber
+
+
+```
+
+## What is the average daily activity pattern?
+To answer this question, a time series plot will be produced for the average total number of steps taken for each interval across all days.
+
+1. Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis).
+2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?.
+
+
+
+###Methodology and Result
+
+
+1. Calculate the average number of steps taken in each 5-minute interval per day using dplyr and group by interval:
+
+```{r}
+# Average number of steps taken
+averageSteps <- summarise(group_by(activity, interval), "steps" = mean(steps, na.rm = T))
+print(averageSteps)
+
+```
+
+Use base ploting system for making the time series of the 5-minute interval and average steps taken:
+
+```{r}
+
+with(averageSteps, plot(interval, steps, type = "l", xlab = "Interval", ylab = "Number of Steps", main="Average Number of Steps per Day by Interval"))
+```
+
+2. Use which.max() to find out the maximum steps, on average, across all the days:
+
+```{r}
+maxi <- averageSteps[which.max(averageSteps$steps), ]
+print(maxi)
+```
+
+```{r echo = FALSE}
+maxInterval <- maxi$interval
+maxSteps <- maxi$steps
+```
+The interval `r maxInterval ` has, on average, the highest count of steps, with 206 steps.
+
+
+## Imputing missing values
+
+1. Calculate and report missing values
+```{r}
+missingValue <- sum(is.na(activity$steps))
+
+```
+
+
+```{r echo=FALSE}
+missingValue
+```
+There are a total of `r missingValue` missing values for the step variable in activity data
+
+2. Let's take the approach to fill in a missing NA with the average number of steps in the same 5-min interval.
+3. Create a new dataset as the original and use transform, ifelse and match function for filling in the missing values with the average number of steps per 5-minute interval:
+
+```{r}
+imputed_data <- transform(activity , steps = ifelse(is.na(activity$steps), averageSteps$steps[match(activity$interval, averageSteps$interval)], activity$steps))
+print(head(imputed_data))
+
+# Check that there are no missing values
+sum(is.na(imputed_data$steps))
+```
+
+4. Calculate the number of steps taken in each 5-minute interval per day using dplyr and group by interval. Use base plot system for making the histogram
+
+```{r}
+full_steps <- summarise(group_by(imputed_data, date), steps = sum(steps))
+print(full_steps)
+
+hist(full_steps$steps, xlab = "number of steps per day", main = "Total steps taken each day", col = "violet")
+
+# Mean and Median
+
+mean_full <- mean(full_steps$steps, na.rm = TRUE)
+mean_full
+median_full <- median(full_steps$steps, na.rm = TRUE)
+median_full
+```
+The impact of imputing missing data with the average number of steps in the same 5-min interval is that both the mean and the median are equal to the same value: 10766.
+
+
+## Are there differences in activity patterns between weekdays and weekends?
+
+Use dplyr and mutate to create a new column, weektype, and apply whether the day is weekend or weekday:
+```{r}
+library(lubridate)
+
+imputed_data <- mutate(imputed_data, weektype = ifelse(weekdays(imputed_data$date) == "Saturday" | weekdays(imputed_data$date) == "Sunday", "weekend", "weekday"))
+imputed_data$weektype <- as.factor(imputed_data$weektype)
+head(imputed_data)
+```
+
+2. Calculate the average steps in the 5-minute interval and use ggplot2 package for making the time series of the 5-minute interval for weekday and weekend, and compare the average steps:
+
+```{r}
+library(ggplot2)
+interval_full <- imputed_data %>%group_by(interval, weektype) %>% summarise(steps = mean(steps))
+
+s <- ggplot(interval_full, aes(interval, steps, color = weektype)) +
+  geom_line() +
+  facet_wrap(~weektype, ncol = 1, nrow = 2)
+print(s)
+```
