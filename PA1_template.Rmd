@@ -64,6 +64,7 @@ steps_day <- summarise(group_by(activity, date), "steps" = sum(steps, na.rm = T)
 print(steps_day)
 
 # create a histogram
+
 hist(steps_day$steps, xlab = "number of steps per day", main = "Total steps taken each day", col = "blue")
 
 #mean and median of the total steps
